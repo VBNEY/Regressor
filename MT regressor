@@ -22,7 +22,7 @@ library(tidyverse)
 #cl <- makeCluster(cores)
 #registerDoParallel(cores)
 set.seed(123)
- 
+  
 syntetic_sampling_keepingP<-function(df,groupby='cluster_principal',n_groupby_tg=30,TARGET=c(),semente=123){
   
   set.seed(semente)	
@@ -612,7 +612,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   resumo<-tabela_resumo[11:13,]
   return(resumo) 
 }
-undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=600,N_max_group=60,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F){
+undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=600,N_max_group=60,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F){
   
   rename_columns<-function(df,caracteres=c('.',',',';',' ','~','*','[',']','{','}','(',')','&')){
     for (i in 1:NCOL(df)){for(j in caracteres){names(df)[i]<-gsub(paste0("\\",j),"",names(df)[i])}}
@@ -620,8 +620,11 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   dtini<-Sys.time()
   
   dataset_temp<-x
-  dataset_temp$cluster_principal<-''
+  #identifica colunas iniciais, as numéricas, remove as não desejadas definidas
   dataset_temp<-rename_columns(dataset_temp)
+  colunas_iniciais<-colnames(dataset_temp)
+  dataset_temp$cluster_principal<-''
+  
   
   if(sum(is.na(dataset_temp))>0){
     stop("There are some missing data, please solve this issue and execute the function again...")
@@ -637,8 +640,6 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     }else{
       perce_original <- c()}}
   
-  #identifica colunas iniciais, as numéricas, remove as não desejadas definidas 
-  colunas_iniciais<-colnames(dataset_temp)
   dataset_temp$cluster<-''
   colunas_numericas <- colnames(dataset_temp[,unlist(lapply(dataset_temp, is.numeric))])
   colunas_numericas <- setdiff(colunas_numericas,exclude_feature)
@@ -932,12 +933,10 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   }
   rm(df_cluster)
   
-  if(add_idsample==T){colunas_iniciais<-c(colunas_iniciais,'ID_AMOSTRA')}
+  #selecionando as amostras escolhidas
   dataset_temp<-dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,]
   dataset_temp$ID_AMOSTRA<-(1-dataset_temp$ID_AMOSTRA)
   
-  dataset_temp<-dataset_temp[,colunas_iniciais]
-  dataset_temp <-dataset_temp[,c(setdiff(colnames(dataset_temp),TARGET),TARGET)]
   print(paste0(dtini,' ~ ',Sys.time()))
   
   #identifica colunas com dados identicos(zerovar)
@@ -948,7 +947,12 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   }
   zerovar<-names(foo(dataset_temp))
   colunas_uteis<-setdiff(colunas_iniciais,zerovar)
-  dataset_temp<-dataset_temp[,colunas_uteis]
+  
+  if(add_cluster_idsample==T){
+    colunas_uteis<-c(colunas_uteis,'ID_AMOSTRA','cluster_principal')}
+  
+  #coloca a target no final
+  dataset_temp<-dataset_temp[,c(setdiff(colunas_uteis,TARGET),TARGET)]
   
   print(dim(dataset_temp))
   dtfim<-Sys.time()
@@ -1231,10 +1235,12 @@ model4 <- train(x=dataset[,TRAIN_VECTOR], y=dataset[,TARGET], method='naive_baye
 
 
 
-Modelo <- model1
+Modelo <- model0
 # Predição dos dados de teste
 y_pred = predict(Modelo, newdata = dataset_amostra)
 summary(Modelo)
+
+mean(Modelo$results$Rsquared)
 
 #COMPARAR PREVISTO E REAL POR PADRÃO DE AÇO
 Union_table <- cbind(dataset_amostra,Y = as.vector(round(y_pred,1)))
@@ -1242,6 +1248,7 @@ plot(Union_table[,c('LIM_RESISTENCIA','Y')])
 
 write.table(Union_table, file="Resultado.csv",row.names=FALSE,sep=";")
 
+plot(dataset[,TRAIN_VECTOR])
 
 
 stopCluster(cl)
