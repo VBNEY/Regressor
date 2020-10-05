@@ -790,6 +790,8 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     for (j in vetor_groupby){
       print(j)
       vetor0<-dataset_temp[,i]==j
+      NROW_LOOP<-NROW(dataset_temp[vetor0,])
+      n_balance_loop<-ifelse(n_balance>NROW_LOOP,NROW_LOOP,n_balance)
       
       #combina as colunas mais relevantes para amostrar 2 a 2
       if(length(special_cluster[special_cluster[,1]==j,1])==1 | length(perce_original)==0){
@@ -806,8 +808,6 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         }
       }
       
-      NROW_LOOP<-NROW(dataset_temp[vetor0,])
-      n_balance_loop<-ifelse(n_balance>NROW_LOOP,NROW_LOOP,n_balance)
       vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0
       NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
       NROW_LOOP1<-sum(vetor0 & dataset_temp[,'ID_AMOSTRA']>0)
@@ -1230,7 +1230,7 @@ model1 <- train(x=dataset[,TRAIN_VECTOR], y=dataset[,TARGET], method='glm', trCo
 model2 <- train(x=dataset[,TRAIN_VECTOR], y=dataset[,TARGET], method='rf', trControl=trainControl, metric = METRIC, importance = F, ntree = 500,replace=FALSE)
 model3 <- train(x=dataset[,TRAIN_VECTOR], y=dataset[,TARGET], method='C5.0Tree', trControl=trainControl, metric = METRIC) #Decision Tree
 model4 <- train(x=dataset[,TRAIN_VECTOR], y=dataset[,TARGET], method='naive_bayes', trControl=trainControl, metric = METRIC,preProcess=PP)
-#model6 <- train(x=dataset[,TRAIN_VECTOR], y=dataset[,TARGET], method='nnet', trControl=trainControl,metric = METRIC,preProcess=PP, importance = TRUE, .size=5,maxit=1000)
+model6 <- train(x=dataset[,TRAIN_VECTOR], y=dataset[,TARGET], method='nnet', trControl=trainControl,metric = METRIC,preProcess=PP, importance = TRUE, .size=5,maxit=1000)
 #model7 <- train(x=dataset[,TRAIN_VECTOR], y=dataset[,TARGET], method='gbm', trControl=trainControl, metric = METRIC,preProcess=PP)
 
 
