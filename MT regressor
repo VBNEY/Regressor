@@ -885,7 +885,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   print(tempo_processamento)
   return(dataset_temp)	
 }
-syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=5,TARGET=c(),semente=123){
+syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=10,TARGET=c(),semente=123){
   statmod <- function(x) {
     z <- table(as.vector(x))
     names(z)[z == max(z)]
@@ -939,6 +939,7 @@ syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=5,TARGET
       # deixa aleatório as amostras no dataset temporário
       #Não usar uma qtde maior que a disponível
       qtde_linhas <- round(runif(1, min=NMIN ,max =NMAX))#n_TRIGGER)) #escolhe o tamanho da amostra (2 no mínimo)
+      dataset_temp2<-dataset_temp2[sample(nrow(dataset_temp2)),]
       dataset_temp2<-dataset_temp2[1:qtde_linhas,]
       
       #transforma o dataset em um de uma linha com média das colunas numéricas
@@ -975,6 +976,7 @@ syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=5,TARGET
   }
   
   if(exists("syntetic_temp")){
+    syntetic_temp<-syntetic_temp[!duplicated(syntetic_temp[,numericalcol]),]
     dataset_cluster_final<-rbind(syntetic_temp,dataset_temp_out,dataset_temp_in)
   }else{
     dataset_cluster_final<-rbind(dataset_temp_out,dataset_temp_in)}
@@ -1106,10 +1108,10 @@ manual_group<-c('C;9','SI;5','MN;7','P;2','AL;2','TI;5','NB;5','V;2','CR;2','CU;
 dataset<-undersampling_byclusters(x=dataset,n_balance=800,N_max_group=60,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
 
 #Criando amostra sintética de forma distribuída
-dataset<-syntetic_sampling(dataset,TARGET=TARGET,n_groupby_tg = 5,groupby = c('cluster_principal'))
+dataset<-syntetic_sampling(dataset,TARGET=TARGET,n_groupby_tg = 10,groupby = c('cluster_principal'))
 
 str(dataset)
-write.table(left_join(dataset, dataset_link, by = c("SEQ_ID" = "SEQ_ID")), file="Amostragem Balaceada kmeans2.csv",row.names=FALSE,sep=";")
+write.table(dataset, file="Amostragem Balaceada kmeans2.csv",row.names=FALSE,sep=";")
 
 #------------------------------------------------------------------------------
 #Remove duplicated columns
