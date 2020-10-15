@@ -12,7 +12,7 @@ options(scipen=999)#Não utilizar notação cientifica
 options(digits=5) 
 
 library(caret)
-library(dplyr)
+#library(dplyr)
 library(randomForest)
 library(skimr)
 #library(doParallel)
@@ -147,10 +147,6 @@ Get_Fast_Correlations <- function(data_set, features_to_ignore=c('SEQ_ID','clust
   #	dim(pair_wise_correlation_matrix)	
   plot(pair_wise_correlation_matrix$value)
   return(pair_wise_correlation_matrix)
-}
-statmod <- function(x) {
-  z <- table(as.vector(x))
-  names(z)[z == max(z)]
 }
 vote<-function(vector=c(),amount_of_vote =3){
   acum_rank<-data.frame(vector)
@@ -890,6 +886,10 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   return(dataset_temp)	
 }
 syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=5,TARGET=c(),semente=123){
+  statmod <- function(x) {
+    z <- table(as.vector(x))
+    names(z)[z == max(z)]
+  }
   
   set.seed(semente)
   dataset_temp<-df
@@ -939,7 +939,7 @@ syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=5,TARGET
       # deixa aleatório as amostras no dataset temporário
       #Não usar uma qtde maior que a disponível
       qtde_linhas <- round(runif(1, min=NMIN ,max =NMAX))#n_TRIGGER)) #escolhe o tamanho da amostra (2 no mínimo)
-      dataset_temp2<-sample_n(dataset_temp2,qtde_linhas)
+      dataset_temp2<-dataset_temp2[1:qtde_linhas,]
       
       #transforma o dataset em um de uma linha com média das colunas numéricas
       for(c in numericalcol){				
@@ -1089,7 +1089,7 @@ dataset<-intomissing_bycorrelation(dataset,cutoff=0.7)
 
 #Amostragem da população bruta
 dataset <-dataset[,c(setdiff(colnames(dataset),TARGET),TARGET)]
-test_sample_population <-0.10
+test_sample_population <-0.20
 
 #Retira 1º amostra da populacao bruta (Definição de Cutoff ou avaliação do modelo)
 dataset<-dataset[sample(nrow(dataset)),]
