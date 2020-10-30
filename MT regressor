@@ -22,7 +22,7 @@ library(tidyverse)
 #cl <- makeCluster(cores)
 #registerDoParallel(cores)
 set.seed(123)
-  
+
 has_letter_or_isfactor <- function(x){
   x <- x[complete.cases(x),]
   if(nrow(x)>5000){
@@ -885,11 +885,15 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   print(tempo_processamento)
   return(dataset_temp)	
 }
-syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=10,TARGET=c(),semente=123){
+syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=10,TARGET=c(),semente=123,allow_dupl=F){
   statmod <- function(x) {
     z <- table(as.vector(x))
     names(z)[z == max(z)]
   }
+  
+  if(n_groupby_tg==0){
+    print('No syntetic samples were created, change n_groupby_tg parameter...')
+    return(df)}
   
   set.seed(semente)
   dataset_temp<-df
@@ -976,7 +980,8 @@ syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=10,TARGE
   }
   
   if(exists("syntetic_temp")){
-    syntetic_temp<-syntetic_temp[!duplicated(syntetic_temp[,numericalcol]),]
+    if(allow_dupl==F){
+      syntetic_temp<-syntetic_temp[!duplicated(syntetic_temp[,numericalcol]),]}
     dataset_cluster_final<-rbind(syntetic_temp,dataset_temp_out,dataset_temp_in)
   }else{
     dataset_cluster_final<-rbind(dataset_temp_out,dataset_temp_in)}
@@ -1052,7 +1057,7 @@ analise_exploratoria <- function(x,nome = 'Analise Exploratoria',TARGET=TARGET )
 
 
 #------------------------------------------------------------------------------
-BD = 'D:/TM2.txt' 
+BD = 'D:/TM3.txt' 
 dataset <- read.table(file = BD, header = TRUE, sep='\t',dec = ",", stringsAsFactors = FALSE)
 dataset<-dataset[sample(nrow(dataset)),]
 TARGET=c('LR')
@@ -1064,7 +1069,7 @@ campos<-c('C','SI','MN','S','P','AL','TI','NB','V','CR','CU','NI','MO','B','N','
 dataset<-dataset[,campos]
 
 dataset<-dataset[complete.cases(dataset[,c('LE','LR','TB','C')]),]
-dataset<-dataset[dataset[TARGET]!=999 & dataset[TARGET]<9999 & dataset[TARGET]>0,]
+dataset<-dataset[dataset[TARGET]!=999 & dataset[TARGET]<9999 & dataset[TARGET]>140,]
 str(dataset)
 
 
@@ -1105,10 +1110,7 @@ dataset<-smart_complete(x=dataset,TARGET=TARGET)
 if(exists("TRAIN_VECTOR")){dataset<-dataset[complete.cases(dataset[,TRAIN_VECTOR]),]}else{dataset<-dataset[complete.cases(dataset),]}
 
 manual_group<-c('C;9','SI;5','MN;7','P;2','AL;2','TI;5','NB;5','V;2','CR;2','CU;2','NI;2','MO;2','N;2','B;2','TB;3','EP_;5')
-dataset<-undersampling_byclusters(x=dataset,n_balance=800,N_max_group=60,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
-
-#Criando amostra sintética de forma distribuída
-dataset<-syntetic_sampling(dataset,TARGET=TARGET,n_groupby_tg = 10,groupby = c('cluster_principal'))
+dataset<-undersampling_byclusters(x=dataset,n_balance=1200,N_max_group=90,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
 
 str(dataset)
 write.table(dataset, file="Amostragem Balaceada kmeans2.csv",row.names=FALSE,sep=";")
@@ -1174,11 +1176,27 @@ TRAIN_VECTOR<-vote(TRAIN_VECTOR_ACM,2)
 TRAIN_VECTOR<-c('C','SI','MN','P','AL','TI','NB','V','CR','CU','NI','MO','B','N','TB','EP_')
 
 #Executa o modelo de random forest
-dtini<-Sys.time()
-classifier <- randomForest(x = dataset[,TRAIN_VECTOR],y=dataset[,TARGET],ntree = 500,keep.forest=T,importance=F)#,keep.forest=TRUE,importance=TRUE)
-dtfim<-Sys.time()
-qtde<-NROW(dataset)
-extra<-paste0(dtini,"~",dtfim," | n=",qtde)
+info_acumulador<-data.frame(n_sintetica =0, mse_modelo=0.0,rsq_modelo=0.0,mse_amostra=0.0,rsq_amostra=0.0,extra="")
+rsq <- function (x, y) cor(x, y) ^ 2
+for(sintetic in c(0,5,10,15,20,30)){
+  dtini<-Sys.time()
+  #Criando amostra sintética de forma distribuída
+  df_temp<-syntetic_sampling(dataset,TARGET=TARGET,n_groupby_tg = sintetic,groupby = c('cluster_principal'))
+  classifier <- randomForest(x = df_temp[,TRAIN_VECTOR],y=df_temp[,TARGET],ntree = 500,keep.forest=T,importance=F)#,keep.forest=TRUE,importance=TRUE)
+  dtfim<-Sys.time()
+  qtde<-NROW(df_temp)
+  extra<-paste0(dtini,"~",dtfim," | n=",qtde)
+  dataset_amostra<-dataset_amostra[complete.cases(dataset_amostra[,c(TRAIN_VECTOR,TARGET)]),c(TRAIN_VECTOR,TARGET)]
+  y_pred = predict(classifier, newdata = dataset_amostra)
+  mse_amostra<-mean((y_pred-dataset_amostra[,TARGET])^2)
+  rsq_amostra<-rsq(y_pred,dataset_amostra[,TARGET])
+  info_acumulador_temp<-data.frame(n_sintetica =sintetic, mse_modelo=mean(classifier$mse),rsq_modelo=mean(classifier$rsq),mse_amostra=mse_amostra,rsq_amostra=rsq_amostra,extra=extra)
+  info_acumulador<-rbind(info_acumulador,info_acumulador_temp)
+}
+
+
+
+
 #saveRDS(classifier, "modeloLE.rds")
 #classifier <- randomForest(x = dataset[,TRAIN_VECTOR],y=dataset[,TARGET],mtry =7,ntree = 250,keep.forest=T,importance=F)#,keep.forest=TRUE,importance=TRUE)
 #saveRDS(classifier, "modeloLR.rds")
@@ -1190,6 +1208,7 @@ length(TRAIN_VECTOR)
 dataset_amostra<-dataset_amostra[complete.cases(dataset_amostra[,c(TRAIN_VECTOR,TARGET)]),c(TRAIN_VECTOR,TARGET)]
 y_pred = predict(classifier, newdata = dataset_amostra)
 summary(classifier)
+
 
 
 #COMPARAR PREVISTO E REAL POR PADRÃO DE AÇO
