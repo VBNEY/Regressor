@@ -981,8 +981,13 @@ syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=10,TARGE
   
   if(exists("syntetic_temp")){
     if(allow_dupl==F){
-      syntetic_temp<-syntetic_temp[!duplicated(syntetic_temp[,numericalcol]),]}
-    dataset_cluster_final<-rbind(syntetic_temp,dataset_temp_out,dataset_temp_in)
+      syntetic_temp<-syntetic_temp[!duplicated(syntetic_temp[,numericalcol]),]
+      dataset_cluster_final<-rbind(syntetic_temp,dataset_temp_out,dataset_temp_in)
+    }else{
+      syntetic_temp<-rbind(syntetic_temp,dataset_temp_in)
+      syntetic_temp<-syntetic_temp[!duplicated(syntetic_temp[,numericalcol]),]
+      dataset_cluster_final<-rbind(syntetic_temp,dataset_temp_out)
+    }
   }else{
     dataset_cluster_final<-rbind(dataset_temp_out,dataset_temp_in)}
   dataset_cluster_final<-dataset_cluster_final[sample(nrow(dataset_cluster_final)),]
@@ -1072,17 +1077,10 @@ dataset<-dataset[complete.cases(dataset[,c('LE','LR','TB','C')]),]
 dataset<-dataset[dataset[TARGET]!=999 & dataset[TARGET]<9999 & dataset[TARGET]>140,]
 str(dataset)
 
-
 #analise visual------------------------------------------------------------------
 colunas_numericas <- colnames(dataset[,unlist(lapply(dataset, is.numeric))])
 skim(dataset[,colunas_numericas])
-
 analise_exploratoria(dataset,TARGET=TARGET, nome='pre_outliers')
-
-#Limpar outliers manualmente------------------------------------------------------
-df_outlier<-data.frame(var=c("Agua","Vel"),lim_inf=c(0.6,0.3),lim_sup=c(1.4,1.6),stringsAsFactors = F)
-for (y in df_outlier[,1]){
-  dataset[,y][!is.na(dataset[,y]) & (dataset[,y] < df_outlier[df_outlier[1]==y,2] | dataset[,y] > df_outlier[df_outlier[1]==y,3])] <-NA}
 
 #Limpar outliers automaticamente
 dataset<-cross_outliercleaning(dataset,size=4)
@@ -1112,9 +1110,7 @@ if(exists("TRAIN_VECTOR")){dataset<-dataset[complete.cases(dataset[,TRAIN_VECTOR
 manual_group<-c('C;9','SI;5','MN;7','P;2','AL;2','TI;5','NB;5','V;2','CR;2','CU;2','NI;2','MO;2','N;2','B;2','TB;3','EP_;5')
 dataset<-undersampling_byclusters(x=dataset,n_balance=1200,N_max_group=90,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
 
-str(dataset)
-write.table(dataset, file="Amostragem Balaceada kmeans2.csv",row.names=FALSE,sep=";")
-
+#write.table(dataset, file="Amostragem Balaceada kmeans2.csv",row.names=FALSE,sep=";")
 #------------------------------------------------------------------------------
 #Remove duplicated columns
 dim(dataset)
@@ -1149,6 +1145,7 @@ TRAIN_VECTOR<-var_predictors_boruta
 #------------------------------------------------------------------------------
 
 TRAIN_VECTOR<-c('C','SI','MN','P','AL','TI','NB','V','CR','CU','NI','MO','B','N','TB','EP_')
+conjunto_na <- colnames(dataset_amostra[, colSums(is.na(dataset_amostra)) > 0 ])
 
 #Executa o modelo de random forest
 info_acumulador<-data.frame(n_sintetica =0,sintetic_dupl=T, rmse_modelo=0.0, mae_modelo=0.0,rsq_modelo=0.0,rmse_amostra=0.0, mae_amostra=0.0,rsq_amostra=0.0,extra="")
@@ -1159,6 +1156,7 @@ for(duplicidade in c(F,T)){
     #Criando amostra sintética de forma distribuída
     df_temp<-syntetic_sampling(dataset,TARGET=TARGET,n_groupby_tg = sintetic,groupby = c('cluster_principal'),allow_dupl=duplicidade)
     classifier <- randomForest(x = df_temp[,TRAIN_VECTOR],y=df_temp[,TARGET],ntree = 500,keep.forest=T,importance=F)
+    #saveRDS(classifier, "modeloLE.rds")
     dtfim<-Sys.time()
     qtde<-NROW(df_temp)
     extra<-paste0(dtini,"~",dtfim," | n=",qtde)
@@ -1179,20 +1177,6 @@ for(duplicidade in c(F,T)){
 }
 
 
-#saveRDS(classifier, "modeloLE.rds")
-#classifier <- randomForest(x = dataset[,TRAIN_VECTOR],y=dataset[,TARGET],mtry =7,ntree = 250,keep.forest=T,importance=F)#,keep.forest=TRUE,importance=TRUE)
-#saveRDS(classifier, "modeloLR.rds")
-
-conjunto_na <- colnames(dataset_amostra[, colSums(is.na(dataset_amostra)) > 0 ])
-length(TRAIN_VECTOR)
-
-# Predição dos dados de teste
-dataset_amostra<-dataset_amostra[complete.cases(dataset_amostra[,c(TRAIN_VECTOR,TARGET)]),c(TRAIN_VECTOR,TARGET)]
-y_pred = predict(classifier, newdata = dataset_amostra)
-summary(classifier)
-
-
-
 #COMPARAR PREVISTO E REAL POR PADRÃO DE AÇO
 Union_table <- cbind(dataset_amostra,Y = as.vector(round(y_pred,1)))
 plot(Union_table[,c(TARGET,'Y')])
@@ -1204,12 +1188,11 @@ pdf('Numero_arvores.pdf')
 plot(classifier)
 dev.off()
 
+##ACHAR MELHOR PARA (Hyperparâmetro mtry)
+tuneRF(dataset[,TRAIN_VECTOR],dataset[ , TARGET], stepFactor=1.5)
+
 #Verificação da importancia das variáveis do modelo
 importance(classifier)
 pdf('ImportanciaRF.pdf')
 plot(varImpPlot(classifier))
 dev.off()
-
-##ACHAR MELHOR PARA (Hyperparâmetro mtry)
-tuneRF(dataset[,TRAIN_VECTOR],dataset[ , TARGET], stepFactor=1.5)
-
