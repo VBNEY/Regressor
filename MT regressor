@@ -981,13 +981,11 @@ syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=10,TARGE
   
   if(exists("syntetic_temp")){
     if(allow_dupl==F){
-      syntetic_temp<-syntetic_temp[!duplicated(syntetic_temp[,numericalcol]),]
-      dataset_cluster_final<-rbind(syntetic_temp,dataset_temp_out,dataset_temp_in)
-    }else{
       syntetic_temp<-rbind(syntetic_temp,dataset_temp_in)
       syntetic_temp<-syntetic_temp[!duplicated(syntetic_temp[,numericalcol]),]
       dataset_cluster_final<-rbind(syntetic_temp,dataset_temp_out)
-    }
+    }else{
+      dataset_cluster_final<-rbind(syntetic_temp,dataset_temp_in,dataset_temp_out)}
   }else{
     dataset_cluster_final<-rbind(dataset_temp_out,dataset_temp_in)}
   dataset_cluster_final<-dataset_cluster_final[sample(nrow(dataset_cluster_final)),]
@@ -1119,7 +1117,7 @@ dim(dataset)
 
 #Feature selection by correlation with multicolinearity elimination
 TRAIN_VECTOR_FILTER<- rownames(data.frame(which(sapply( dataset, class ) == 'numeric' )))
-TRAIN_VECTOR_FILTER<-setdiff(TRAIN_VECTOR_FILTER,c('LIM_ESCOAMENTO','ALONGAMENTO','REDUCAO_AREA'))
+TRAIN_VECTOR_FILTER<-setdiff(TRAIN_VECTOR_FILTER,c('LE'))
 
 TRAIN_VECTOR_FILTER<-feature_selection_bycorrelation(DF=dataset[,TRAIN_VECTOR_FILTER],cutoff_target=0.00,cutoff_betweenvar=0.90,TARGET=TARGET,features_to_ignore=c('SEQ_ID','cluster','cluster_simples'),nfolds =1)
 TRAIN_VECTOR<-setdiff(TRAIN_VECTOR_FILTER,TARGET)
@@ -1141,7 +1139,6 @@ Labels<-data.frame(vlr = data.frame(Labels),var = rownames(data.frame(Labels)),s
 var_predictors_boruta<-Labels[Labels[,1]>=quantile(Labels[,1],0.25),2]
 
 TRAIN_VECTOR<-var_predictors_boruta
-
 #------------------------------------------------------------------------------
 
 TRAIN_VECTOR<-c('C','SI','MN','P','AL','TI','NB','V','CR','CU','NI','MO','B','N','TB','EP_')
