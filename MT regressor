@@ -1107,7 +1107,7 @@ rm(random_splits)
 dataset<-smart_complete(x=dataset,TARGET=TARGET)
 if(exists("TRAIN_VECTOR")){dataset<-dataset[complete.cases(dataset[,TRAIN_VECTOR]),]}else{dataset<-dataset[complete.cases(dataset),]}
 
-manual_group<-c('C;9','SI;5','MN;7','P;2','AL;2','TI;5','NB;5','V;2','CR;2','CU;2','NI;2','MO;2','N;2','B;2','TB;3','EP_;5')
+manual_group<-c('C;8','SI;4','MN;6','P;2','AL;2','TI;5','NB;5','V;2','CR;2','CU;2','NI;2','MO;2','N;2','B;2','TB;3','EP_;5')
 dataset<-undersampling_byclusters(x=dataset,n_balance=1200,N_max_group=90,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
 
 #write.table(dataset, file="Amostragem Balaceada kmeans2.csv",row.names=FALSE,sep=";")
@@ -1151,7 +1151,7 @@ conjunto_na <- colnames(dataset_amostra[, colSums(is.na(dataset_amostra)) > 0 ])
 info_acumulador<-data.frame(n_sintetica =0,sintetic_dupl=T, rmse_modelo=0.0, mae_modelo=0.0,rsq_modelo=0.0,rmse_amostra=0.0, mae_amostra=0.0,rsq_amostra=0.0,extra="")
 rsq <- function (x, y) cor(x, y) ^ 2
 for(duplicidade in c(F,T)){
-  for(sintetic in c(0,5,10)){
+  for(sintetic in c(0,5,10,15,20)){
     dtini<-Sys.time()
     #Criando amostra sintética de forma distribuída
     df_temp<-syntetic_sampling(dataset,TARGET=TARGET,n_groupby_tg = sintetic,groupby = c('cluster_principal'),allow_dupl=duplicidade)
