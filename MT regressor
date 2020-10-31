@@ -517,7 +517,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   resumo<-tabela_resumo[11:13,]
   return(resumo) 
 }
-undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=600,N_max_group=60,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F){
+undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=900,N_max_group=90,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F){
   
   foo <- function(dat) {
     out <- lapply(dat, function(x) length(unique(x)))
@@ -595,7 +595,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     datasetCluster <- kmeans(mydata, centers = n_clusters, iter.max = 50, nstart = 17,algorithm = c("Hartigan-Wong"))
     dataset_temp$cluster_temp<-paste(coluna,"."	,datasetCluster$cluster,";", sep="")
     dataset_temp$cluster <- paste(dataset_temp$cluster, dataset_temp$cluster_temp, sep="")
-    
+
     if((coluna %in% colunas_numericas)){
       formula_aggregate<- as.formula(paste("cbind(",TARGET,",",coluna,") ~ cluster_temp"))
       detalhe_cluster<- aggregate(formula_aggregate, data=dataset_temp,FUN= {function(x) c(avg=mean(x), sd=sd(x), count=length(x),min=min(x),max=max(x),sum=sum(x))})
@@ -652,8 +652,9 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
       if(id_rm==F){
         dataset_temp[,paste0("V_",itemp)]<-paste(coluna,"."	,datasetCluster$cluster,";", sep="")
         itemp<-itemp+1
-        dataset_temp$cluster_principal <- paste(dataset_temp$cluster_principal, dataset_temp$cluster_temp, sep="")}
-      
+        if(paste0(TARGET)!=coluna){ #Não coloca no cluster combinado a variável target
+          dataset_temp$cluster_principal <- paste(dataset_temp$cluster_principal, dataset_temp$cluster_temp, sep="")}
+        }
     }
     
     gc()
