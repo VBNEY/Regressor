@@ -517,7 +517,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   resumo<-tabela_resumo[11:13,]
   return(resumo) 
 }
-undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=900,N_max_group=90,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F,redundance_elimination=F){
+undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=1500,N_max_group=60,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F,redundance_elimination=F){
   
   foo <- function(dat) {
     out <- lapply(dat, function(x) length(unique(x)))
@@ -1063,16 +1063,22 @@ analise_exploratoria <- function(x,nome = 'Analise Exploratoria',TARGET=TARGET )
 BD = 'D:/TM3.txt' 
 dataset <- read.table(file = BD, header = TRUE, sep='\t',dec = ",", stringsAsFactors = FALSE)
 dataset<-dataset[sample(nrow(dataset)),]
-TARGET=c('LR')
+TARGET=c('LE')
 
 #trata caracteres nas colunas
 dataset<-rename_columns(dataset)
 
-campos<-c('C','SI','MN','S','P','AL','TI','NB','V','CR','CU','NI','MO','B','N','TB','EP_SHTBR','EP_','T1_L0','LE','LR')
+#renomeando os campos
+names(dataset)[names(dataset) =='EP_']<-'EP_BQ'
+elementos<-c('C','Si','Mn','S','P','Al','Ti','Nb','V','Cr','Cu','Ni','Mo','B','N','Sb','Ca')
+for (elemento in elementos){names(dataset)[names(dataset) ==toupper(elemento)]<-paste0(elemento)}
+
+campos<-c('C','Si','Mn','S','P','Al','Ti','Nb','V','Cr','Cu','Ni','Mo','B','N','TB','EP_SHTBR','EP_BQ','T1_L0','LE','LR')
 dataset<-dataset[,campos]
 
 dataset<-dataset[complete.cases(dataset[,c('LE','LR','TB','C')]),]
 dataset<-dataset[dataset[TARGET]!=999 & dataset[TARGET]<9999 & dataset[TARGET]>140,]
+dataset$N<-dataset$N*10000
 str(dataset)
 
 #analise visual------------------------------------------------------------------
@@ -1105,8 +1111,7 @@ rm(random_splits)
 dataset<-smart_complete(x=dataset,TARGET=TARGET)
 if(exists("TRAIN_VECTOR")){dataset<-dataset[complete.cases(dataset[,TRAIN_VECTOR]),]}else{dataset<-dataset[complete.cases(dataset),]}
 
-manual_group<-c('C;8','SI;4','MN;6','P;2','AL;2','TI;5','NB;5','V;2','CR;2','CU;2','NI;2','MO;2','N;2','B;2','TB;3','EP_;5')
-dataset<-undersampling_byclusters(x=dataset,n_balance=1200,N_max_group=90,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
+manual_group<-c('C;8','Si;4','Mn;6','P;2','Al;2','Ti;5','Nb;5','V;2','Cr;2','Cu;2','Ni;2','Mo;2','N;2','B;2','TB;3','EP_BQ;5')
 
 #write.table(dataset, file="Amostragem Balaceada kmeans2.csv",row.names=FALSE,sep=";")
 #------------------------------------------------------------------------------
@@ -1141,19 +1146,19 @@ var_predictors_boruta<-Labels[Labels[,1]>=quantile(Labels[,1],0.25),2]
 TRAIN_VECTOR<-var_predictors_boruta
 #------------------------------------------------------------------------------
 
-TRAIN_VECTOR<-c('C','SI','MN','P','AL','TI','NB','V','CR','CU','NI','MO','B','N','TB','EP_')
+TRAIN_VECTOR<-c('C','Si','Mn','P','Al','Ti','Nb','V','Cr','Cu','Ni','Mo','B','N','TB','EP_BQ')
 conjunto_na <- colnames(dataset_amostra[, colSums(is.na(dataset_amostra)) > 0 ])
 
 #Executa o modelo de random forest
-info_acumulador<-data.frame(n_sintetica =0,sintetic_dupl=T, rmse_modelo=0.0, mae_modelo=0.0,rsq_modelo=0.0,rmse_amostra=0.0, mae_amostra=0.0,rsq_amostra=0.0,extra="")
+info_acumulador<-data.frame(n_amostra =0,clustern=0, rmse_modelo=0.0, mae_modelo=0.0,rsq_modelo=0.0,rmse_amostra=0.0, mae_amostra=0.0,rsq_amostra=0.0,extra="")
 rsq <- function (x, y) cor(x, y) ^ 2
-for(duplicidade in c(F,T)){
-  for(sintetic in c(0,5,10,15,20)){
+for(clustern in c(60)){
+  for(amostran in c(1500)){
     dtini<-Sys.time()
     #Criando amostra sintética de forma distribuída
-    df_temp<-syntetic_sampling(dataset,TARGET=TARGET,n_groupby_tg = sintetic,groupby = c('cluster_principal'),allow_dupl=duplicidade)
+    df_temp<-undersampling_byclusters(x=dataset,n_balance=amostran,N_max_group=clustern,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
     classifier <- randomForest(x = df_temp[,TRAIN_VECTOR],y=df_temp[,TARGET],ntree = 500,keep.forest=T,importance=F)
-    #saveRDS(classifier, "modeloLE.rds")
+    saveRDS(classifier, paste0('modelo',TARGET,'.rds'))
     dtfim<-Sys.time()
     qtde<-NROW(df_temp)
     extra<-paste0(dtini,"~",dtfim," | n=",qtde)
@@ -1168,7 +1173,7 @@ for(duplicidade in c(F,T)){
     rmse_amostra<-sqrt(mean((y_pred-dataset_amostra[,TARGET])^2))
     mae_amostra<-mean(abs(y_pred-dataset_amostra[,TARGET]))
     rsq_amostra<-rsq(y_pred,dataset_amostra[,TARGET])
-    info_acumulador_temp<-data.frame(n_sintetica =sintetic,sintetic_dupl=duplicidade,rmse_modelo=rmse_modelo,mae_modelo=mae_modelo,rsq_modelo=rsq_modelo,rmse_amostra=rmse_amostra,mae_amostra=mae_amostra,rsq_amostra=rsq_amostra,extra=extra)
+    info_acumulador_temp<-data.frame(n_amostra =amostran,clustern=clustern,rmse_modelo=rmse_modelo,mae_modelo=mae_modelo,rsq_modelo=rsq_modelo,rmse_amostra=rmse_amostra,mae_amostra=mae_amostra,rsq_amostra=rsq_amostra,extra=extra)
     info_acumulador<-rbind(info_acumulador,info_acumulador_temp)
   }
 }
