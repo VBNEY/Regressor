@@ -517,7 +517,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   resumo<-tabela_resumo[11:13,]
   return(resumo) 
 }
-undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=1500,N_max_group=60,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F,redundance_elimination=F){
+undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=1500,N_max_group=45,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,add_outliers=T,redundance_elimination=F){
   
   foo <- function(dat) {
     out <- lapply(dat, function(x) length(unique(x)))
@@ -724,7 +724,9 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
             dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
             vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance*redutor-NROW_LOOP1)
             soma_rownum<-sum(vetor_rownum)
-            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(runif(soma_rownum,0.05,0.95),2)
+            amostra_temp<-(1:soma_rownum)/soma_rownum
+            amostra_temp<-amostra_temp[sample(soma_rownum)]
+            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(amostra_temp,2)
           }
         }
       }
@@ -737,7 +739,9 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
       if(NROW_LOOP1<n_balance_loop & NROW_LOOP0>0){
         vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance_loop-NROW_LOOP1)
         soma_rownum<-sum(vetor_rownum)
-        dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(runif(soma_rownum,0.05,0.95),2)}
+        amostra_temp<-(1:soma_rownum)/soma_rownum
+        amostra_temp<-amostra_temp[sample(soma_rownum)]
+        dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(amostra_temp,2)}
       else{
         #garante a retirada de pelo menos 3 amostras em uma região abaixo das obtidas nas recicladas
         coluna<-read.table(text = j, sep = ".", colClasses = "character",stringsAsFactors=F)
@@ -757,16 +761,18 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
             dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
             vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=n_extra
             soma_rownum<-sum(vetor_rownum)
-            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(runif(soma_rownum,0.05,0.95),2)
+            amostra_temp<-(1:soma_rownum)/soma_rownum
+            amostra_temp<-amostra_temp[sample(soma_rownum)]
+            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(amostra_temp,2)
           }
         }
       }
     }		
   }
   
-  if(rm_outliers==T){
+  if(add_outliers==T){
     #tramento para remocao de outliers
-    print("Removendo outliers...")
+    print("Adding outliers...")
     for(i in new_columns_names){
       qtde_groupby<- aggregate(as.formula(paste(TARGET, "~", i)), data=dataset_temp,FUN=length)
       vetor_groupby<- qtde_groupby[order(qtde_groupby[,2]),1]
@@ -779,10 +785,12 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         media_temp<-mean(dataset_temp[vetor0,coluna])
         desvio_temp<-sd(dataset_temp[vetor0,coluna])
         H <- (qnt[3]-qnt[2])*3
-        if(min_max_geral[1]==qnt[1] ){#somente se for no menor  cluster 
-          dataset_temp[dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-6*desvio_temp),'ID_AMOSTRA']<-0}
-        if(min_max_geral[2]==qnt[4]){#somente se for no maior cluster 
-          dataset_temp[dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+6*desvio_temp),'ID_AMOSTRA']<-0}
+        #if(min_max_geral[1]==qnt[1] ){#somente se for no menor  cluster 
+          dataset_temp[dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-6*desvio_temp),'ID_AMOSTRA']<-1
+          #}
+        #if(min_max_geral[2]==qnt[4]){#somente se for no maior cluster 
+          dataset_temp[dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+6*desvio_temp),'ID_AMOSTRA']<-1
+          #}
       }		
     }
   }
@@ -1063,22 +1071,16 @@ analise_exploratoria <- function(x,nome = 'Analise Exploratoria',TARGET=TARGET )
 BD = 'D:/TM3.txt' 
 dataset <- read.table(file = BD, header = TRUE, sep='\t',dec = ",", stringsAsFactors = FALSE)
 dataset<-dataset[sample(nrow(dataset)),]
-TARGET=c('LE')
+TARGET=c('LR')
 
 #trata caracteres nas colunas
 dataset<-rename_columns(dataset)
 
-#renomeando os campos
-names(dataset)[names(dataset) =='EP_']<-'EP_BQ'
-elementos<-c('C','Si','Mn','S','P','Al','Ti','Nb','V','Cr','Cu','Ni','Mo','B','N','Sb','Ca')
-for (elemento in elementos){names(dataset)[names(dataset) ==toupper(elemento)]<-paste0(elemento)}
-
-campos<-c('C','Si','Mn','S','P','Al','Ti','Nb','V','Cr','Cu','Ni','Mo','B','N','TB','EP_SHTBR','EP_BQ','T1_L0','LE','LR')
+campos<-c('C','SI','MN','S','P','AL','TI','NB','V','CR','CU','NI','MO','B','N','TB','EP_SHTBR','EP_','T1_L0','LE','LR')
 dataset<-dataset[,campos]
 
 dataset<-dataset[complete.cases(dataset[,c('LE','LR','TB','C')]),]
 dataset<-dataset[dataset[TARGET]!=999 & dataset[TARGET]<9999 & dataset[TARGET]>140,]
-dataset$N<-dataset$N*10000
 str(dataset)
 
 #analise visual------------------------------------------------------------------
@@ -1110,8 +1112,6 @@ rm(random_splits)
 #tratamento de dados nulos
 dataset<-smart_complete(x=dataset,TARGET=TARGET)
 if(exists("TRAIN_VECTOR")){dataset<-dataset[complete.cases(dataset[,TRAIN_VECTOR]),]}else{dataset<-dataset[complete.cases(dataset),]}
-
-manual_group<-c('C;8','Si;4','Mn;6','P;2','Al;2','Ti;5','Nb;5','V;2','Cr;2','Cu;2','Ni;2','Mo;2','N;2','B;2','TB;3','EP_BQ;5')
 
 #write.table(dataset, file="Amostragem Balaceada kmeans2.csv",row.names=FALSE,sep=";")
 #------------------------------------------------------------------------------
@@ -1146,19 +1146,20 @@ var_predictors_boruta<-Labels[Labels[,1]>=quantile(Labels[,1],0.25),2]
 TRAIN_VECTOR<-var_predictors_boruta
 #------------------------------------------------------------------------------
 
-TRAIN_VECTOR<-c('C','Si','Mn','P','Al','Ti','Nb','V','Cr','Cu','Ni','Mo','B','N','TB','EP_BQ')
+TRAIN_VECTOR<-c('C','SI','MN','P','AL','TI','NB','V','CR','CU','NI','MO','B','N','TB','EP_')
 conjunto_na <- colnames(dataset_amostra[, colSums(is.na(dataset_amostra)) > 0 ])
 
 #Executa o modelo de random forest
 info_acumulador<-data.frame(n_amostra =0,clustern=0, rmse_modelo=0.0, mae_modelo=0.0,rsq_modelo=0.0,rmse_amostra=0.0, mae_amostra=0.0,rsq_amostra=0.0,extra="")
+manual_group<-c('C;9','SI;4','MN;8','P;2','AL;2','TI;6','NB;5','V;2','CR;2','CU;2','NI;2','MO;2','N;2','B;2','TB;3','EP_;5',paste0(TARGET,';10'))
 rsq <- function (x, y) cor(x, y) ^ 2
-for(clustern in c(60)){
-  for(amostran in c(1500)){
+for(clustern in c(45)){
+  for(amostran in c(1000)){
     dtini<-Sys.time()
     #Criando amostra sintética de forma distribuída
     df_temp<-undersampling_byclusters(x=dataset,n_balance=amostran,N_max_group=clustern,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
     classifier <- randomForest(x = df_temp[,TRAIN_VECTOR],y=df_temp[,TARGET],ntree = 500,keep.forest=T,importance=F)
-    saveRDS(classifier, paste0('modelo',TARGET,'.rds'))
+    #saveRDS(classifier, "modeloLE.rds")
     dtfim<-Sys.time()
     qtde<-NROW(df_temp)
     extra<-paste0(dtini,"~",dtfim," | n=",qtde)
@@ -1177,6 +1178,11 @@ for(clustern in c(60)){
     info_acumulador<-rbind(info_acumulador,info_acumulador_temp)
   }
 }
+
+
+str(dataset[dataset$C<=0.0060,])
+
+str(df_temp[df_temp$C<=0.0060,])
 
 
 #COMPARAR PREVISTO E REAL POR PADRÃO DE AÇO
