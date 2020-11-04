@@ -784,13 +784,13 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         min_max_geral <-quantile(dataset_temp[,coluna],probs=c(0,1),na.rm=TRUE)
         media_temp<-mean(dataset_temp[vetor0,coluna])
         desvio_temp<-sd(dataset_temp[vetor0,coluna])
-        H <- (qnt[3]-qnt[2])*3
+        H <- (qnt[3]-qnt[2])*2
         #if(min_max_geral[1]==qnt[1] ){#somente se for no menor  cluster 
-          dataset_temp[dataset_temp[,coluna]>=qnt[1] & dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-6*desvio_temp),'ID_AMOSTRA']<-1
-          #}
+        dataset_temp[dataset_temp[,coluna]>qnt[1] & dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-4*desvio_temp),'ID_AMOSTRA']<-1
+        #}
         #if(min_max_geral[2]==qnt[4]){#somente se for no maior cluster 
-          dataset_temp[dataset_temp[,coluna]<=qnt[4] & dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+6*desvio_temp),'ID_AMOSTRA']<-1
-          #}
+        dataset_temp[dataset_temp[,coluna]<qnt[4] & dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+4*desvio_temp),'ID_AMOSTRA']<-1
+        #}
       }		
     }
   }
@@ -1154,7 +1154,7 @@ info_acumulador<-data.frame(n_amostra =0,clustern=0, rmse_modelo=0.0, mae_modelo
 manual_group<-c('C;9','SI;4','MN;8','P;2','AL;2','TI;6','NB;5','V;2','CR;2','CU;2','NI;2','MO;2','N;2','B;2','TB;3','EP_;5',paste0(TARGET,';7'))
 rsq <- function (x, y) cor(x, y) ^ 2
 for(clustern in c(45)){
-  for(amostran in c(1500)){
+  for(amostran in c(1200)){
     dtini<-Sys.time()
     #Criando amostra sintética de forma distribuída
     df_temp<-undersampling_byclusters(x=dataset,n_balance=amostran,N_max_group=clustern,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
@@ -1179,6 +1179,8 @@ for(clustern in c(45)){
   }
 }
 
+teste<-cbind(dataset_amostra,y_pred)
+str(teste[teste$C<=0.0060,])
 
 str(dataset[dataset$C<=0.0060,])
 str(df_temp[df_temp$C<=0.0060,])
