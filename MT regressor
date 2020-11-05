@@ -517,7 +517,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   resumo<-tabela_resumo[11:13,]
   return(resumo) 
 }
-undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=1500,N_max_group=45,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,add_marginal_data=T,redundance_elimination=F){
+undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=1500,N_max_group=60,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,add_marginal_data=T,redundance_elimination=F){
   
   foo <- function(dat) {
     out <- lapply(dat, function(x) length(unique(x)))
@@ -711,24 +711,29 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         coluna<-read.table(text = j, sep = ".", colClasses = "character",stringsAsFactors=F)
         coluna<-coluna[,1]
         qnt <-quantile(dataset_temp[vetor0,coluna],probs=c(0,0.25,0.75,1),na.rm=TRUE)
-        min_max_geral <-quantile(dataset_temp[,coluna],probs=c(0,1),na.rm=TRUE)
         media_temp<-mean(dataset_temp[vetor0,coluna])
         desvio_temp<-sd(dataset_temp[vetor0,coluna])
-        H <- (qnt[3]-qnt[2])*1.5
+        H <- (qnt[3]-qnt[2])*2.0
         
         for(id_percentil in 1:2){
           if(id_percentil==1){
-            vetor_temp_nao_amostrado<-dataset_temp[,coluna]>qnt[1] & dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-3*desvio_temp)
-          }else{
-            vetor_temp_nao_amostrado<-dataset_temp[,coluna]<qnt[4] & dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+3*desvio_temp)}
+            vetor_temp<-dataset_temp[,coluna]>qnt[1] & dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-4*desvio_temp)
+            NROW_LOOP1<-sum(dataset_temp[,'ID_AMOSTRA']>0 & vetor_temp)
+            vetor_temp_nao_amostrado<-dataset_temp[,'ID_AMOSTRA']==0 & vetor_temp}
+          if(id_percentil==2){
+            vetor_temp<-dataset_temp[,coluna]<qnt[4] & dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+4*desvio_temp)
+            NROW_LOOP1<-sum(dataset_temp[,'ID_AMOSTRA']>0 & vetor_temp)
+            vetor_temp_nao_amostrado<-dataset_temp[,'ID_AMOSTRA']==0 & vetor_temp}
           
           NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
-          dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
-          vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=n_balance*redutor
-          soma_rownum<-sum(vetor_rownum)
-          amostra_temp<-(1:soma_rownum)/soma_rownum
-          amostra_temp<-amostra_temp[sample(soma_rownum)]
-          dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(amostra_temp,2)}
+          if(NROW_LOOP0>0){
+            dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
+            vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(N_max_group-NROW_LOOP1)
+            soma_rownum<-sum(vetor_rownum)
+            amostra_temp<-(1:soma_rownum)/soma_rownum
+            amostra_temp<-amostra_temp[sample(soma_rownum)]
+            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(amostra_temp,2)}
+        }
       }		
     }
     if(length(perce_original)>0){
@@ -1084,7 +1089,7 @@ analise_exploratoria <- function(x,nome = 'Analise Exploratoria',TARGET=TARGET )
 BD = 'D:/TM3.txt' 
 dataset <- read.table(file = BD, header = TRUE, sep='\t',dec = ",", stringsAsFactors = FALSE)
 dataset<-dataset[sample(nrow(dataset)),]
-TARGET=c('LR')
+TARGET=c('LE')
 
 #trata caracteres nas colunas
 dataset<-rename_columns(dataset)
@@ -1097,6 +1102,7 @@ dataset<-dataset[,campos]
 names(dataset)[names(dataset) =='EP_']<-'EP_BQ'
 elementos<-c('C','Si','Mn','S','P','Al','Ti','Nb','V','Cr','Cu','Ni','Mo','B','N','Sb','Ca')
 for (elemento in elementos){names(dataset)[names(dataset) ==toupper(elemento)]<-paste0(elemento)}
+dataset$C_Ti<-dataset$C*dataset$Ti
 
 
 dataset<-dataset[complete.cases(dataset[,c('LE','LR','TB','C')]),]
@@ -1175,23 +1181,25 @@ conjunto_na <- colnames(dataset_amostra[, colSums(is.na(dataset_amostra)) > 0 ])
 
 #Executa o modelo de random forest
 info_acumulador<-data.frame(n_amostra =0,clustern=0, rmse_modelo=0.0, mae_modelo=0.0,rsq_modelo=0.0,rmse_amostra=0.0, mae_amostra=0.0,rsq_amostra=0.0,extra="")
-manual_group<-c('C;9','Si;4','Mn;8','P;2','Al;2','Ti;8','Nb;5','V;3','Cr;3','Cu;2','Ni;2','Mo;3','N;2','B;2','TB;3','EP_BQ;5',paste0(TARGET,';7'))
+manual_group<-c('C;8','Si;4','Mn;7','P;2','Al;2','Ti;5','C_Ti;3','Nb;5','V;2','Cr;2','Cu;2','Ni;2','Mo;2','N;2','B;2','TB;3','EP_BQ;5',paste0(TARGET,';5'))
 rsq <- function (x, y) cor(x, y) ^ 2
-for(clustern in c(45)){
-  for(amostran in c(1200)){
+clustern<-45
+amostran<-1500
+for(clustern in c(60)){
+  for(amostran in c(1500)){
     dtini<-Sys.time()
     #Criando amostra sintética de forma distribuída
-    df_temp<-undersampling_byclusters(x=dataset,n_balance=amostran,N_max_group=clustern,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
-    classifier <- randomForest(x = df_temp[,TRAIN_VECTOR],y=df_temp[,TARGET],ntree = 500,keep.forest=T,importance=F)
+    df_treino<-undersampling_byclusters(x=dataset,n_balance=amostran,N_max_group=clustern,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
+    classifier <- randomForest(x = df_treino[,TRAIN_VECTOR],y=df_treino[,TARGET],mtry=7,ntree = 501,replace=F,keep.forest=T,importance=F)
     saveRDS(classifier, paste0("modelo",TARGET,".rds"))
     dtfim<-Sys.time()
-    qtde<-NROW(df_temp)
+    qtde<-NROW(df_treino)
     extra<-paste0(dtini,"~",dtfim," | n=",qtde)
     
-    y_pred = predict(classifier, newdata = df_temp)
-    rmse_modelo<-sqrt(mean((y_pred-df_temp[,TARGET])^2))
-    mae_modelo<-mean(abs(y_pred-df_temp[,TARGET]))
-    rsq_modelo<-rsq(y_pred,df_temp[,TARGET])
+    y_pred = predict(classifier, newdata = df_treino)
+    rmse_modelo<-sqrt(mean((y_pred-df_treino[,TARGET])^2))
+    mae_modelo<-mean(abs(y_pred-df_treino[,TARGET]))
+    rsq_modelo<-rsq(y_pred,df_treino[,TARGET])
     
     dataset_amostra<-dataset_amostra[complete.cases(dataset_amostra[,c(TRAIN_VECTOR,TARGET)]),c(TRAIN_VECTOR,TARGET)]
     y_pred = predict(classifier, newdata = dataset_amostra)
@@ -1207,7 +1215,7 @@ teste<-cbind(dataset_amostra,y_pred)
 str(teste[teste$C<=0.0080,])
 
 str(dataset[dataset$C<=0.0060,])
-str(df_temp[df_temp$C<=0.0060,])
+str(df_treino[df_treino$C<=0.0060,])
 
 
 #COMPARAR PREVISTO E REAL POR PADRÃO DE AÇO
@@ -1222,7 +1230,7 @@ plot(classifier)
 dev.off()
 
 ##ACHAR MELHOR PARA (Hyperparâmetro mtry)
-tuneRF(dataset[,TRAIN_VECTOR],dataset[ , TARGET], stepFactor=1.5)
+tuneRF(df_treino[,TRAIN_VECTOR],df_treino[ , TARGET], stepFactor=1.5)
 
 #Verificação da importancia das variáveis do modelo
 importance(classifier)
