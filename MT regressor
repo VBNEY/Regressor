@@ -1,5 +1,5 @@
 #memory.size()
-$memory.limit(size = 10000) 
+#memory.limit(size = 10000) 
 
 #stopCluster(cl)
 library(mise)
@@ -1183,7 +1183,7 @@ for(clustern in c(45)){
     #Criando amostra sintética de forma distribuída
     df_temp<-undersampling_byclusters(x=dataset,n_balance=amostran,N_max_group=clustern,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
     classifier <- randomForest(x = df_temp[,TRAIN_VECTOR],y=df_temp[,TARGET],ntree = 500,keep.forest=T,importance=F)
-    #saveRDS(classifier, "modeloLE.rds")
+    saveRDS(classifier, paste0("modelo",TARGET,".rds"))
     dtfim<-Sys.time()
     qtde<-NROW(df_temp)
     extra<-paste0(dtini,"~",dtfim," | n=",qtde)
