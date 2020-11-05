@@ -1,5 +1,5 @@
-memory.size()
-memory.limit(size = 10000) 
+#memory.size()
+$memory.limit(size = 10000) 
 
 #stopCluster(cl)
 library(mise)
@@ -517,7 +517,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   resumo<-tabela_resumo[11:13,]
   return(resumo) 
 }
-undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=1500,N_max_group=45,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,add_outliers=T,redundance_elimination=F){
+undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=1500,N_max_group=45,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,add_marginal_data=T,redundance_elimination=F){
   
   foo <- function(dat) {
     out <- lapply(dat, function(x) length(unique(x)))
@@ -701,8 +701,8 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     print(cbind(freq=table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]), perc=prop.table(table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]))*100))}
   
   #Amostragem dos outliers indentificados
-  if(add_outliers==T){
-    print("Adding outliers...")
+  if(add_marginal_data==T){
+    print("Adding marginal data...")
     for(i in new_columns_names){
       qtde_groupby<- aggregate(as.formula(paste(TARGET, "~", i)), data=dataset_temp,FUN=length)
       vetor_groupby<- qtde_groupby[order(qtde_groupby[,2]),1]
@@ -732,7 +732,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
       }		
     }
     if(length(perce_original)>0){
-      print("Após selecao randomizada de outliers...")
+      print("Após selecao randomizada de dados marginais...")
       print(cbind(freq=table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]), perc=prop.table(table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]))*100))}
   }
   
@@ -1084,17 +1084,25 @@ analise_exploratoria <- function(x,nome = 'Analise Exploratoria',TARGET=TARGET )
 BD = 'D:/TM3.txt' 
 dataset <- read.table(file = BD, header = TRUE, sep='\t',dec = ",", stringsAsFactors = FALSE)
 dataset<-dataset[sample(nrow(dataset)),]
-TARGET=c('LR')
+TARGET=c('LE')
 
 #trata caracteres nas colunas
 dataset<-rename_columns(dataset)
 
+#Campos que segem na análise
 campos<-c('C','SI','MN','S','P','AL','TI','NB','V','CR','CU','NI','MO','B','N','TB','EP_SHTBR','EP_','T1_L0','LE','LR')
 dataset<-dataset[,campos]
+
+#renomeando os campos
+names(dataset)[names(dataset) =='EP_']<-'EP_BQ'
+elementos<-c('C','Si','Mn','S','P','Al','Ti','Nb','V','Cr','Cu','Ni','Mo','B','N','Sb','Ca')
+for (elemento in elementos){names(dataset)[names(dataset) ==toupper(elementos)]<-paste0(elemento)}
+
 
 dataset<-dataset[complete.cases(dataset[,c('LE','LR','TB','C')]),]
 dataset<-dataset[dataset[TARGET]!=999 & dataset[TARGET]<9999 & dataset[TARGET]>140,]
 str(dataset)
+
 
 #analise visual------------------------------------------------------------------
 colunas_numericas <- colnames(dataset[,unlist(lapply(dataset, is.numeric))])
@@ -1159,12 +1167,12 @@ var_predictors_boruta<-Labels[Labels[,1]>=quantile(Labels[,1],0.25),2]
 TRAIN_VECTOR<-var_predictors_boruta
 #------------------------------------------------------------------------------
 
-TRAIN_VECTOR<-c('C','SI','MN','P','AL','TI','NB','V','CR','CU','NI','MO','B','N','TB','EP_')
+TRAIN_VECTOR<-c('C','Si','Mn','P','Al','Ti','Nb','V','Cr','Cu','Ni','Mo','B','N','TB','EP_BQ')
 conjunto_na <- colnames(dataset_amostra[, colSums(is.na(dataset_amostra)) > 0 ])
 
 #Executa o modelo de random forest
 info_acumulador<-data.frame(n_amostra =0,clustern=0, rmse_modelo=0.0, mae_modelo=0.0,rsq_modelo=0.0,rmse_amostra=0.0, mae_amostra=0.0,rsq_amostra=0.0,extra="")
-manual_group<-c('C;9','SI;4','MN;8','P;2','AL;2','TI;6','NB;5','V;2','CR;2','CU;2','NI;2','MO;2','N;2','B;2','TB;3','EP_;5',paste0(TARGET,';7'))
+manual_group<-c('C;9','Si;4','Mn;8','P;2','Al;2','Ti;8','Nb;5','V;3','Cr;3','Cu;2','Ni;2','Mo;3','N;2','B;2','TB;3','EP_BQ;5',paste0(TARGET,';7'))
 rsq <- function (x, y) cor(x, y) ^ 2
 for(clustern in c(45)){
   for(amostran in c(1200)){
@@ -1193,7 +1201,7 @@ for(clustern in c(45)){
 }
 
 teste<-cbind(dataset_amostra,y_pred)
-str(teste[teste$C<=0.0060,])
+str(teste[teste$C<=0.0080,])
 
 str(dataset[dataset$C<=0.0060,])
 str(df_temp[df_temp$C<=0.0060,])
