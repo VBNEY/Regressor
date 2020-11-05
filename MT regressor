@@ -700,6 +700,43 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     print("Após selecao randomizada simples e balanceada...")
     print(cbind(freq=table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]), perc=prop.table(table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]))*100))}
   
+  #Amostragem dos outliers indentificados
+  if(add_outliers==T){
+    print("Adding outliers...")
+    for(i in new_columns_names){
+      qtde_groupby<- aggregate(as.formula(paste(TARGET, "~", i)), data=dataset_temp,FUN=length)
+      vetor_groupby<- qtde_groupby[order(qtde_groupby[,2]),1]
+      for (j in vetor_groupby){
+        vetor0<-dataset_temp[,i]==j
+        coluna<-read.table(text = j, sep = ".", colClasses = "character",stringsAsFactors=F)
+        coluna<-coluna[,1]
+        qnt <-quantile(dataset_temp[vetor0,coluna],probs=c(0,0.25,0.75,1),na.rm=TRUE)
+        min_max_geral <-quantile(dataset_temp[,coluna],probs=c(0,1),na.rm=TRUE)
+        media_temp<-mean(dataset_temp[vetor0,coluna])
+        desvio_temp<-sd(dataset_temp[vetor0,coluna])
+        H <- (qnt[3]-qnt[2])*1.5
+        
+        for(id_percentil in 1:2){
+          if(id_percentil==1){
+            vetor_temp_nao_amostrado<-dataset_temp[,coluna]>qnt[1] & dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-3*desvio_temp)
+          }else{
+            vetor_temp_nao_amostrado<-dataset_temp[,coluna]<qnt[4] & dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+3*desvio_temp)}
+          
+          NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
+          dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
+          vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=n_balance*redutor
+          soma_rownum<-sum(vetor_rownum)
+          amostra_temp<-(1:soma_rownum)/soma_rownum
+          amostra_temp<-amostra_temp[sample(soma_rownum)]
+          dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(amostra_temp,2)}
+      }		
+    }
+    if(length(perce_original)>0){
+      print("Após selecao randomizada de outliers...")
+      print(cbind(freq=table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]), perc=prop.table(table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]))*100))}
+  }
+  
+  
   #Amostragem nos clusters criados, aproveitando amostras já selecionadas
   for(i in new_columns_names){
     qtde_groupby<- aggregate(as.formula(paste(TARGET, "~", i)), data=dataset_temp,FUN=length)
@@ -770,30 +807,6 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     }		
   }
   
-  if(add_outliers==T){
-    #tramento para remocao de outliers
-    print("Adding outliers...")
-    for(i in new_columns_names){
-      qtde_groupby<- aggregate(as.formula(paste(TARGET, "~", i)), data=dataset_temp,FUN=length)
-      vetor_groupby<- qtde_groupby[order(qtde_groupby[,2]),1]
-      for (j in vetor_groupby){
-        vetor0<-dataset_temp[,i]==j
-        coluna<-read.table(text = j, sep = ".", colClasses = "character",stringsAsFactors=F)
-        coluna<-coluna[,1]
-        qnt <-quantile(dataset_temp[vetor0,coluna],probs=c(0,0.25,0.75,1),na.rm=TRUE)
-        min_max_geral <-quantile(dataset_temp[,coluna],probs=c(0,1),na.rm=TRUE)
-        media_temp<-mean(dataset_temp[vetor0,coluna])
-        desvio_temp<-sd(dataset_temp[vetor0,coluna])
-        H <- (qnt[3]-qnt[2])*2
-        #if(min_max_geral[1]==qnt[1] ){#somente se for no menor  cluster 
-        dataset_temp[dataset_temp[,coluna]>qnt[1] & dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-4*desvio_temp),'ID_AMOSTRA']<-1
-        #}
-        #if(min_max_geral[2]==qnt[4]){#somente se for no maior cluster 
-        dataset_temp[dataset_temp[,coluna]<qnt[4] & dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+4*desvio_temp),'ID_AMOSTRA']<-1
-        #}
-      }		
-    }
-  }
   
   rm(vetor_rownum,vetor0)
   dataset_temp[dataset_temp[,TARGET]==1,'ID_AMOSTRA']<-1
