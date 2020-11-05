@@ -1096,12 +1096,15 @@ dataset<-dataset[,campos]
 #renomeando os campos
 names(dataset)[names(dataset) =='EP_']<-'EP_BQ'
 elementos<-c('C','Si','Mn','S','P','Al','Ti','Nb','V','Cr','Cu','Ni','Mo','B','N','Sb','Ca')
-for (elemento in elementos){names(dataset)[names(dataset) ==toupper(elementos)]<-paste0(elemento)}
+for (elemento in elementos){names(dataset)[names(dataset) ==toupper(elemento)]<-paste0(elemento)}
 
 
 dataset<-dataset[complete.cases(dataset[,c('LE','LR','TB','C')]),]
 dataset<-dataset[dataset[TARGET]!=999 & dataset[TARGET]<9999 & dataset[TARGET]>140,]
 str(dataset)
+
+
+dataset<-basic_cleaning_to_numbers(dataset,0.33)
 
 
 #analise visual------------------------------------------------------------------
@@ -1172,7 +1175,7 @@ conjunto_na <- colnames(dataset_amostra[, colSums(is.na(dataset_amostra)) > 0 ])
 
 #Executa o modelo de random forest
 info_acumulador<-data.frame(n_amostra =0,clustern=0, rmse_modelo=0.0, mae_modelo=0.0,rsq_modelo=0.0,rmse_amostra=0.0, mae_amostra=0.0,rsq_amostra=0.0,extra="")
-manual_group<-c('C;9','Si;4','Mn;8','P;2','Al;2','Ti;8','Nb;5','V;3','Cr;3','Cu;2','Ni;2','Mo;3','N;2','B;2','TB;3','EP_BQ;5',paste0(TARGET,';7'))
+manual_group<-c('C;9','Si;4','Mn;8','P;2','Al;2','Ti;8','Nb;5','V;3','Cr;3','Cu;2','Ni;2','Mo;3','N;2','B;2','TB;3','EP_BQ;5','LE;7','LR;7')
 rsq <- function (x, y) cor(x, y) ^ 2
 for(clustern in c(45)){
   for(amostran in c(1200)){
