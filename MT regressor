@@ -1084,7 +1084,7 @@ analise_exploratoria <- function(x,nome = 'Analise Exploratoria',TARGET=TARGET )
 BD = 'D:/TM3.txt' 
 dataset <- read.table(file = BD, header = TRUE, sep='\t',dec = ",", stringsAsFactors = FALSE)
 dataset<-dataset[sample(nrow(dataset)),]
-TARGET=c('LE')
+TARGET=c('LR')
 
 #trata caracteres nas colunas
 dataset<-rename_columns(dataset)
@@ -1100,10 +1100,10 @@ for (elemento in elementos){names(dataset)[names(dataset) ==toupper(elemento)]<-
 
 
 dataset<-dataset[complete.cases(dataset[,c('LE','LR','TB','C')]),]
-dataset<-dataset[dataset[TARGET]!=999 & dataset[TARGET]<9999 & dataset[TARGET]>140,]
+dataset<-dataset[dataset['LE']!=999 & dataset['LR']!=999 & dataset['LR']<9999 & dataset['LE']<9999 & dataset['LE']>140 & dataset['LR']>140,]
 str(dataset)
 
-
+#limpando os números
 dataset<-basic_cleaning_to_numbers(dataset,0.33)
 
 
@@ -1183,7 +1183,7 @@ for(clustern in c(45)){
     #Criando amostra sintética de forma distribuída
     df_temp<-undersampling_byclusters(x=dataset,n_balance=amostran,N_max_group=clustern,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
     classifier <- randomForest(x = df_temp[,TRAIN_VECTOR],y=df_temp[,TARGET],ntree = 500,keep.forest=T,importance=F)
-    saveRDS(classifier, paste0("modelo",TARGET,".rds"))
+    #saveRDS(classifier, paste0("modelo",TARGET,".rds"))
     dtfim<-Sys.time()
     qtde<-NROW(df_temp)
     extra<-paste0(dtini,"~",dtfim," | n=",qtde)
