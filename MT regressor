@@ -1175,7 +1175,7 @@ conjunto_na <- colnames(dataset_amostra[, colSums(is.na(dataset_amostra)) > 0 ])
 
 #Executa o modelo de random forest
 info_acumulador<-data.frame(n_amostra =0,clustern=0, rmse_modelo=0.0, mae_modelo=0.0,rsq_modelo=0.0,rmse_amostra=0.0, mae_amostra=0.0,rsq_amostra=0.0,extra="")
-manual_group<-c('C;9','Si;4','Mn;8','P;2','Al;2','Ti;8','Nb;5','V;3','Cr;3','Cu;2','Ni;2','Mo;3','N;2','B;2','TB;3','EP_BQ;5','LE;7','LR;7')
+manual_group<-c('C;9','Si;4','Mn;8','P;2','Al;2','Ti;8','Nb;5','V;3','Cr;3','Cu;2','Ni;2','Mo;3','N;2','B;2','TB;3','EP_BQ;5',paste0(TARGET,';7'))
 rsq <- function (x, y) cor(x, y) ^ 2
 for(clustern in c(45)){
   for(amostran in c(1200)){
@@ -1183,7 +1183,7 @@ for(clustern in c(45)){
     #Criando amostra sintética de forma distribuída
     df_temp<-undersampling_byclusters(x=dataset,n_balance=amostran,N_max_group=clustern,groupby=manual_group,TARGET=TARGET,add_cluster_idsample=T)
     classifier <- randomForest(x = df_temp[,TRAIN_VECTOR],y=df_temp[,TARGET],ntree = 500,keep.forest=T,importance=F)
-    #saveRDS(classifier, paste0("modelo",TARGET,".rds"))
+    saveRDS(classifier, paste0("modelo",TARGET,".rds"))
     dtfim<-Sys.time()
     qtde<-NROW(df_temp)
     extra<-paste0(dtini,"~",dtfim," | n=",qtde)
